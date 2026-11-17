@@ -2,7 +2,7 @@
 
 A Snake game built from scratch in Verilog, simulated with Icarus Verilog. The long-term goal is to build a small RISC-V CPU on top of what I learn here.
 
-**Status:** in progress. The VGA pipeline, game grid, tick timer, and snake head movement are done and verified. Everything is verified in simulation only, with no FPGA hardware yet.
+**Status:** in progress. The VGA pipeline, game grid, tick timer, snake movement, and growing body are done and verified. Food, collisions, and the game-over logic are next. Everything is verified in simulation only, with no FPGA hardware yet.
 
 ## What's done
 
@@ -11,9 +11,11 @@ A Snake game built from scratch in Verilog, simulated with Icarus Verilog. The l
 - [x] 20x15 game grid with border
 - [x] Game tick timer
 - [x] Snake head movement
-- [ ] Snake body storage
-- [ ] Food (LFSR), growth, and collisions
-- [ ] Game state machine and score display
+- [x] Snake occupancy map (one bit per cell)
+- [x] Snake body storage (position queue with growth)
+- [ ] Food (LFSR-placed) and eating
+- [ ] Collisions and game-over state machine
+- [ ] Score display
 
 ## VGA timing
 
@@ -30,12 +32,23 @@ Both sync signals are active low.
 
 The testbench checks that `hsync` is low for 96 clocks per line, `vsync` is low for 1600 clocks per frame (2 lines), and `active` is high for 640 x 480 = 307200 clocks per frame.
 
-## Snake head movement
+## How the game works
 
-The screen is a 20x15 grid of 32x32-pixel cells. A game tick pulses about 8 times per second, and on each tick the snake head moves one cell in its current direction. Frame 0 (left) and frame 4 (right), moving right:
+The screen is a 20x15 grid of 32x32-pixel cells. A tick generator pulses about 8 times per second. On each tick:
 
-![Frame 0](docs/frame0.png)
-![Frame 4](docs/frame4.png)
+1. The snake head moves one cell in its current direction.
+2. The new head cell is added to a position queue and marked in a 300-bit occupancy map.
+3. Unless the snake is growing, the oldest cell (the tail) is removed from the queue and cleared from the map.
+
+The pixel generator asks the map whether each pixel's cell is occupied, so drawing the snake is a single lookup per pixel instead of comparing against every segment.
+
+## Snake movement and growth
+
+The snake grows for the first four moves, then just crawls. Frames 0, 4, and 8, moving right (bright green is the head):
+
+![Frame 0](docs/snake0.png)
+![Frame 4](docs/snake4.png)
+![Frame 8](docs/snake8.png)
 
 ## Run it
 
@@ -65,10 +78,32 @@ iverilog -o sim rtl/snake_head.v tb/snake_head_tb.v
 vvp sim
 ```
 
+Snake occupancy map:
+```
+iverilog -o sim rtl/snake_map.v tb/snake_map_tb.v
+vvp sim
+```
+
+Snake body queue (uses the map):
+```
+iverilog -o sim rtl/snake_map.v rtl/snake_body.v tb/snake_body_tb.v
+vvp sim
+```
+
 Whole design (top level):
 ```
-iverilog -o sim rtl/vga_sync.v rtl/game_tick.v rtl/snake_head.v rtl/pixel_gen.v rtl/vga_top.v tb/vga_top_tb.v
+iverilog -o sim rtl/vga_sync.v rtl/game_tick.v rtl/snake_head.v rtl/snake_map.v rtl/snake_body.v rtl/pixel_gen.v rtl/vga_top.v tb/vga_top_tb.v
 vvp sim
+```
+
+## Render frames
+
+The movement demo writes three frames as PPM images, and a small Python script converts them to PNG (needs `pip install pillow`):
+
+```
+iverilog -o sim rtl/vga_sync.v rtl/game_tick.v rtl/snake_head.v rtl/snake_map.v rtl/snake_body.v rtl/pixel_gen.v rtl/vga_top.v tb/snake_dump_tb.v
+vvp sim
+python -c "from PIL import Image; [Image.open(f'snake{n}.ppm').save(f'docs/snake{n}.png') for n in (0,4,8)]"
 ```
 
 ## Layout
