@@ -13,7 +13,7 @@ module snake_map_tb;
         .clk(clk), .rst(rst),
         .set_en(set_en), .set_x(set_x), .set_y(set_y),
         .clear_en(clear_en), .clear_x(clear_x), .clear_y(clear_y),
-        .rd_x(rd_x), .rd_y(rd_y), .rd_occupied(rd_occupied)
+        .rd_x(rd_x), .rd_y(rd_y), .rd_occupied(rd_occupied), .rd2_x(5'd0), .rd2_y(4'd0), .rd2_occupied()
     );
 
     always #20 clk = ~clk;
