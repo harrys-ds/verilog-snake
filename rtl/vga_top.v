@@ -9,6 +9,7 @@ module vga_top #(
     output wire       hsync,
     output wire       vsync,
     output wire       game_over,
+    output wire       move_tick,     // the tick the snake head moves on
     output wire [3:0] r,
     output wire [3:0] g,
     output wire [3:0] b
@@ -17,6 +18,7 @@ module vga_top #(
     wire [9:0]  x, y;
     wire        tick;                // raw tick from the timer
     wire        tick_run = tick & ~game_over;   // no moving once the game is over
+    assign move_tick = tick_run;
     wire        game_rst;
     wire [4:0]  head_x;
     wire [3:0]  head_y;
