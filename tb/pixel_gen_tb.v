@@ -68,6 +68,11 @@ module pixel_gen_tb;
         // 14: food on the head's cell -> red + green = yellow
         active = 1; food_x = 10; food_y = 7; x = 320; y = 240;
         check(4'hF, 4'hF, 4'h0, 14);
+        // 15: game over: a border pixel turns red
+        game_over = 1; food_valid = 0; x = 0; y = 0;
+        check(4'hF, 4'h0, 4'h0, 15);
+        // 16: game over: an empty interior pixel stays black
+        x = 100; y = 100; check(4'h0, 4'h0, 4'h0, 16);
 
         if (errors == 0) $display("PASS");
         else             $display("FAIL: %0d check(s) failed", errors);

@@ -72,8 +72,7 @@ module autoplay_dump_tb;
 
         // play until the snake has eaten three pieces of food (length 4)
         n = 0;
-        while (dut.length < 4 && n < 300) begin
-            steer;
+        while (dut.length < 4 && n < 300 && !dut.game_over) begin            steer;
             game_tick_once;
             n = n + 1;
         end
