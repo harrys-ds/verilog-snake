@@ -13,7 +13,7 @@ A Snake game built from scratch in Verilog, simulated with Icarus Verilog. The l
 - [x] Snake head movement
 - [x] Snake occupancy map (one bit per cell)
 - [x] Snake body storage (position queue with growth)
-- [ ] Food (LFSR-placed) and eating
+- [x] Food (LFSR-placed) and eating
 - [ ] Collisions and game-over state machine
 - [ ] Score display
 
@@ -87,6 +87,12 @@ vvp sim
 Snake body queue (uses the map):
 ```
 iverilog -o sim rtl/snake_map.v rtl/snake_body.v tb/snake_body_tb.v
+vvp sim
+```
+
+LFSR (pseudo-random numbers, used for food placement):
+```
+iverilog -o sim rtl/lfsr16.v tb/lfsr16_tb.v
 vvp sim
 ```
 
