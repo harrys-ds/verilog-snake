@@ -2,6 +2,7 @@
 
 module frame_dump_tb;
     reg [1:0] dir = 2'd1;
+    reg grow = 0;
     reg clk = 0;
     reg rst = 1;
     wire hsync, vsync;
@@ -9,7 +10,7 @@ module frame_dump_tb;
     integer f;
 
     vga_top dut (
-        .clk(clk), .rst(rst),
+        .clk(clk), .rst(rst), .dir(dir), .grow(grow),
         .hsync(hsync), .vsync(vsync),
         .r(r), .g(g), .b(b)
     );
