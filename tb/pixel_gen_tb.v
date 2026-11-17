@@ -3,9 +3,9 @@
 module pixel_gen_tb;
     reg active;
     reg [9:0] x, y;
-    reg [4:0] head_x;
-    reg [3:0] head_y;
-    reg body_occupied;
+    reg [4:0] head_x, food_x;
+    reg [3:0] head_y, food_y;
+    reg body_occupied, food_valid;
     wire [3:0] r, g, b;
     integer errors;
 
@@ -13,6 +13,7 @@ module pixel_gen_tb;
         .active(active), .x(x), .y(y),
         .head_x(head_x), .head_y(head_y),
         .body_occupied(body_occupied),
+        .food_x(food_x), .food_y(food_y), .food_valid(food_valid),
         .r(r), .g(g), .b(b)
     );
 
@@ -30,6 +31,7 @@ module pixel_gen_tb;
     initial begin
         errors = 0;
         head_x = 10; head_y = 7; body_occupied = 0;
+        food_x = 5;  food_y = 3; food_valid = 0;
 
         // 1: top-left corner is border -> blue
         active = 1; x = 0;   y = 0;   check(4'h0, 4'h0, 4'hF, 1);
@@ -54,6 +56,18 @@ module pixel_gen_tb;
         x = 100; y = 100; check(4'h0, 4'hF, 4'h0, 9);
         // 10: occupied but active low -> black
         active = 0; x = 320; y = 240; check(4'h0, 4'h0, 4'h0, 10);
+
+        // --- food cases: head back at (10,7), nothing occupied ---
+        head_x = 10; head_y = 7; body_occupied = 0; active = 1;
+        // 11: food is valid at (5,3); pixel (165,101) is inside it -> red
+        food_valid = 1; x = 165; y = 101; check(4'hF, 4'h0, 4'h0, 11);
+        // 12: same pixel, food not valid -> black
+        food_valid = 0; check(4'h0, 4'h0, 4'h0, 12);
+        // 13: food valid but active low -> black
+        food_valid = 1; active = 0; check(4'h0, 4'h0, 4'h0, 13);
+        // 14: food on the head's cell -> red + green = yellow
+        active = 1; food_x = 10; food_y = 7; x = 320; y = 240;
+        check(4'hF, 4'hF, 4'h0, 14);
 
         if (errors == 0) $display("PASS");
         else             $display("FAIL: %0d check(s) failed", errors);
