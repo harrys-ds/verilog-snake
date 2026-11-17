@@ -2,7 +2,7 @@
 
 A Snake game built from scratch in Verilog, simulated with Icarus Verilog. The long-term goal is to build a small RISC-V CPU on top of what I learn here.
 
-**Status:** in progress. The VGA pipeline, game grid, tick timer, snake movement, and growing body are done and verified. Food, collisions, and the game-over logic are next. Everything is verified in simulation only, with no FPGA hardware yet.
+**Status:** in progress. The core game is done and verified in simulation: video output, grid, movement, growth, food, collisions, game over, and restart. Direction input and the score display are next. There is no FPGA hardware yet.
 
 ## What's done
 
@@ -14,7 +14,8 @@ A Snake game built from scratch in Verilog, simulated with Icarus Verilog. The l
 - [x] Snake occupancy map (one bit per cell)
 - [x] Snake body storage (position queue with growth)
 - [x] Food (LFSR-placed) and eating
-- [ ] Collisions and game-over state machine
+- [x] Collisions and game-over state machine
+- [ ] Direction input (ignore U-turns)
 - [ ] Score display
 
 ## VGA timing
@@ -42,6 +43,12 @@ The screen is a 20x15 grid of 32x32-pixel cells. A tick generator pulses about 8
 
 The pixel generator asks the map whether each pixel's cell is occupied, so drawing the snake is a single lookup per pixel instead of comparing against every segment.
 
+Food is placed by a 16-bit LFSR (a small pseudo-random generator). A candidate cell is accepted only if it is inside the border and not on the snake. When the head reaches the food, the snake grows on its next move.
+
+## Rules
+
+The game ends when the head enters a border cell or a cell already occupied by the snake's own body. Moving into the cell the tail is leaving on the same move is allowed. When the game is over, the snake freezes and the border turns red. A restart input resets the game logic (timer, snake, map, food) but keeps the video timing and the random generator running, so each new game gets different food.
+
 ## Snake movement and growth
 
 The snake grows for the first four moves, then just crawls. Frames 0, 4, and 8, moving right (bright green is the head):
@@ -49,6 +56,19 @@ The snake grows for the first four moves, then just crawls. Frames 0, 4, and 8, 
 ![Frame 0](docs/snake0.png)
 ![Frame 4](docs/snake4.png)
 ![Frame 8](docs/snake8.png)
+
+## Food
+
+An autopilot in the testbench steers toward the food until the snake has eaten three pieces. Start (left) and end (right); food is the red cell:
+
+![Start](docs/food_start.png)
+![End](docs/food_end.png)
+
+## Game over
+
+The snake hit the wall: it freezes, and the border turns red.
+
+![Game over](docs/gameover.png)
 
 ## Run it
 
@@ -96,20 +116,53 @@ iverilog -o sim rtl/lfsr16.v tb/lfsr16_tb.v
 vvp sim
 ```
 
+Food controller (uses the LFSR and the map):
+```
+iverilog -o sim rtl/lfsr16.v rtl/snake_map.v rtl/food_ctrl.v tb/food_ctrl_tb.v
+vvp sim
+```
+
+Game controller (collisions and game over):
+```
+iverilog -o sim rtl/game_ctrl.v tb/game_ctrl_tb.v
+vvp sim
+```
+
 Whole design (top level):
 ```
-iverilog -o sim rtl/vga_sync.v rtl/game_tick.v rtl/snake_head.v rtl/snake_map.v rtl/snake_body.v rtl/pixel_gen.v rtl/vga_top.v tb/vga_top_tb.v
+iverilog -o sim rtl/vga_sync.v rtl/game_tick.v rtl/snake_head.v rtl/snake_map.v rtl/snake_body.v rtl/lfsr16.v rtl/food_ctrl.v rtl/game_ctrl.v rtl/pixel_gen.v rtl/vga_top.v tb/vga_top_tb.v
+vvp sim
+```
+
+Game over and restart (drives the snake into the wall, checks it freezes, then restarts):
+```
+iverilog -o sim rtl/vga_sync.v rtl/game_tick.v rtl/snake_head.v rtl/snake_map.v rtl/snake_body.v rtl/lfsr16.v rtl/food_ctrl.v rtl/game_ctrl.v rtl/pixel_gen.v rtl/vga_top.v tb/gameover_tb.v
 vvp sim
 ```
 
 ## Render frames
 
-The movement demo writes three frames as PPM images, and a small Python script converts them to PNG (needs `pip install pillow`):
+The demo testbenches write frames as PPM images, and a small Python script converts them to PNG (needs `pip install pillow`). The commands below all use the same ten design files.
 
+Snake growth (frames 0, 4, 8):
 ```
-iverilog -o sim rtl/vga_sync.v rtl/game_tick.v rtl/snake_head.v rtl/snake_map.v rtl/snake_body.v rtl/pixel_gen.v rtl/vga_top.v tb/snake_dump_tb.v
+iverilog -o sim rtl/vga_sync.v rtl/game_tick.v rtl/snake_head.v rtl/snake_map.v rtl/snake_body.v rtl/lfsr16.v rtl/food_ctrl.v rtl/game_ctrl.v rtl/pixel_gen.v rtl/vga_top.v tb/snake_dump_tb.v
 vvp sim
 python -c "from PIL import Image; [Image.open(f'snake{n}.ppm').save(f'docs/snake{n}.png') for n in (0,4,8)]"
+```
+
+Autoplay food demo:
+```
+iverilog -o sim rtl/vga_sync.v rtl/game_tick.v rtl/snake_head.v rtl/snake_map.v rtl/snake_body.v rtl/lfsr16.v rtl/food_ctrl.v rtl/game_ctrl.v rtl/pixel_gen.v rtl/vga_top.v tb/autoplay_dump_tb.v
+vvp sim
+python -c "from PIL import Image; [Image.open(f'food_{n}.ppm').save(f'docs/food_{n}.png') for n in ('start','end')]"
+```
+
+Game over frame:
+```
+iverilog -o sim rtl/vga_sync.v rtl/game_tick.v rtl/snake_head.v rtl/snake_map.v rtl/snake_body.v rtl/lfsr16.v rtl/food_ctrl.v rtl/game_ctrl.v rtl/pixel_gen.v rtl/vga_top.v tb/gameover_tb.v
+vvp sim
+python -c "from PIL import Image; Image.open('gameover.ppm').save('docs/gameover.png')"
 ```
 
 ## Layout
