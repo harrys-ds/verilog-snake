@@ -1,8 +1,8 @@
 # Verilog Snake
 
-A Snake game built from scratch in Verilog, simulated with Icarus Verilog. The long-term goal is to build a small RISC-V CPU on top of what I learn here.
+A Snake game built from scratch in Verilog. It is verified with self-checking testbenches in Icarus Verilog, and it is playable with the keyboard through a Verilator + SDL2 front end. The long-term goal is to build a small RISC-V CPU on top of what I learn here.
 
-**Status:** in progress. The full game is done and verified in simulation: video output, grid, movement, growth, food, collisions, game over, restart, button direction input, and a seven-segment score display. Next up is an interactive window so it can be played with a keyboard. There is no FPGA hardware yet.
+**Status:** complete in simulation. Video output, grid, movement, growth, food, collisions, game over, restart, button direction input, and a seven-segment score display all work and are tested. The same Verilog also runs in Verilator, where it is checked against the VGA timing spec for whole frames and can be played live in a window. There is no FPGA hardware yet.
 
 ## What's done
 
@@ -17,7 +17,7 @@ A Snake game built from scratch in Verilog, simulated with Icarus Verilog. The l
 - [x] Collisions and game-over state machine
 - [x] Direction input (ignore U-turns)
 - [x] Score display (seven-segment)
-- [ ] Interactive window (play with the keyboard)
+- [x] Interactive window (play with the keyboard)
 
 ## VGA timing
 
@@ -85,9 +85,23 @@ The snake hit the wall: it freezes, and the border turns red.
 
 ![Game over](docs/gameover.png)
 
+## Verilator and the live window
+
+Icarus is an interpreter and is too slow to run a whole game in real time. Verilator translates the Verilog into C++ instead, so the design becomes a fast C++ model driven by my own code.
+
+- `verilator/sim_main.cpp` runs 31 full frames (13 million clock cycles), checks `hsync` and `vsync` against the VGA timing on every cycle, and writes frames 0 and 30 as images. It reports zero sync mismatches.
+- `verilator/play_main.cpp` opens an SDL2 window, maps the arrow keys / WASD to the four button inputs and R to restart, and shows the score by decoding the three seven-segment output pins in C++. Key-down events are latched so a quick tap is never missed.
+
+Simulated time is slower than real hardware time, so the game's tick divider is set from the measured frame rate: `TICK_DIV` of about `fps x 52500` gives 8 moves per second.
+
+Frames rendered by the Verilator model (start and 30 frames in):
+
+![Verilator frame 0](docs/vframe0.png)
+![Verilator frame 30](docs/vframe30.png)
+
 ## Run it
 
-Requires [Icarus Verilog](https://bleyer.org/icarus/) and GTKWave. Run each one on its own from the project folder and look for `PASS`.
+The Icarus tests need [Icarus Verilog](https://bleyer.org/icarus/) and GTKWave. Run each one on its own from the project folder and look for `PASS`.
 
 VGA sync generator:
 ```
@@ -173,6 +187,23 @@ iverilog -o sim rtl/vga_sync.v rtl/game_tick.v rtl/snake_head.v rtl/snake_map.v 
 vvp sim
 ```
 
+### Verilator
+
+Needs Verilator 5, a C++ toolchain, and SDL2 (`sudo apt install verilator build-essential libsdl2-dev`). On Windows, run these inside WSL.
+
+Whole-game frame check (prints `sync mismatches: 0` and writes `vframe0.ppm` and `vframe30.ppm`):
+```
+verilator --cc --exe --build -j 0 -Wno-fatal --top-module snake_top --Mdir verilator/obj_dir rtl/*.v verilator/sim_main.cpp
+./verilator/obj_dir/Vsnake_top
+```
+
+Play it (arrow keys or WASD steer, R restarts, Esc quits):
+```
+mkdir -p verilator/play
+verilator --cc --exe --build -j 0 -Wno-fatal -O3 --top-module snake_top -GTICK_DIV=1500000 --Mdir verilator/play/obj_dir -CFLAGS "-O3 $(sdl2-config --cflags)" -LDFLAGS "$(sdl2-config --libs)" rtl/*.v verilator/play_main.cpp
+./verilator/play/obj_dir/Vsnake_top
+```
+
 ## Render frames
 
 The demo testbenches write frames as PPM images, and a small Python script converts them to PNG (needs `pip install pillow`). The commands below all use the same ten design files.
@@ -198,10 +229,16 @@ vvp sim
 python -c "from PIL import Image; Image.open('gameover.ppm').save('docs/gameover.png')"
 ```
 
+Verilator frames (after running the Verilator frame check above):
+```
+python -c "from PIL import Image; [Image.open(f'vframe{n}.ppm').save(f'docs/vframe{n}.png') for n in (0,30)]"
+```
+
 ## Layout
 
 ```
-rtl/    Verilog design files
-tb/     Testbenches
-docs/   Diagrams, waveform screenshots, rendered frames
+rtl/        Verilog design files
+tb/         Icarus testbenches
+verilator/  C++ testbench and the SDL2 player
+docs/       Diagrams, waveform screenshots, rendered frames
 ```
