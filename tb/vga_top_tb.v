@@ -1,6 +1,7 @@
 `timescale 1ns/1ps
 
 module vga_top_tb;
+    reg [1:0] dir = 2'd1;
     reg clk = 0;
     reg rst = 1;
     wire hsync, vsync;
