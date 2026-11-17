@@ -1,3 +1,5 @@
 sim
 *.vcd
 *.vvp
+obj_dir/
+*.ppm
