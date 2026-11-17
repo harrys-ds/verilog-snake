@@ -2,7 +2,7 @@
 
 A Snake game built from scratch in Verilog, simulated with Icarus Verilog. The long-term goal is to build a small RISC-V CPU on top of what I learn here.
 
-**Status:** in progress. The core game is done and verified in simulation: video output, grid, movement, growth, food, collisions, game over, and restart. Direction input and the score display are next. There is no FPGA hardware yet.
+**Status:** in progress. The full game is done and verified in simulation: video output, grid, movement, growth, food, collisions, game over, restart, button direction input, and a seven-segment score display. Next up is an interactive window so it can be played with a keyboard. There is no FPGA hardware yet.
 
 ## What's done
 
@@ -15,8 +15,9 @@ A Snake game built from scratch in Verilog, simulated with Icarus Verilog. The l
 - [x] Snake body storage (position queue with growth)
 - [x] Food (LFSR-placed) and eating
 - [x] Collisions and game-over state machine
-- [ ] Direction input (ignore U-turns)
-- [ ] Score display
+- [x] Direction input (ignore U-turns)
+- [x] Score display (seven-segment)
+- [ ] Interactive window (play with the keyboard)
 
 ## VGA timing
 
@@ -48,6 +49,20 @@ Food is placed by a 16-bit LFSR (a small pseudo-random generator). A candidate c
 ## Rules
 
 The game ends when the head enters a border cell or a cell already occupied by the snake's own body. Moving into the cell the tail is leaving on the same move is allowed. When the game is over, the snake freezes and the border turns red. A restart input resets the game logic (timer, snake, map, food) but keeps the video timing and the random generator running, so each new game gets different food.
+
+## Direction input
+
+Four buttons steer the snake. `dir_ctrl` handles three things:
+
+- **Synchronizer.** Each button goes through two flip-flops so an asynchronous press can't glitch the logic.
+- **No U-turns.** A request opposite to the direction the snake last moved is ignored. With the encoding 0 up, 1 right, 2 down, 3 left, the opposite of `d` is `d ^ 2'b10`.
+- **Fast double presses.** The controller keeps `dir_cur` (the last move) and `dir_next` (the request), and checks new requests against the right one, including on the exact clock edge a tick fires. This stops two quick presses from sneaking in a reversal.
+
+`snake_top` wraps `dir_ctrl` and the game core, and is the module that would map onto a board's pins.
+
+## Score display
+
+The snake's length is shown as a decimal number on three seven-segment digits, active-low like the DE2 board's displays. `seg7` is the digit decoder, and `score_display` splits the number into digits and blanks leading zeros (so 7 shows as 7, not 007).
 
 ## Snake movement and growth
 
@@ -128,6 +143,18 @@ iverilog -o sim rtl/game_ctrl.v tb/game_ctrl_tb.v
 vvp sim
 ```
 
+Direction controller (U-turn protection, double presses, tick-edge race):
+```
+iverilog -o sim rtl/dir_ctrl.v tb/dir_ctrl_tb.v
+vvp sim
+```
+
+Seven-segment decoder and score display:
+```
+iverilog -o sim rtl/seg7.v rtl/score_display.v tb/score_display_tb.v
+vvp sim
+```
+
 Whole design (top level):
 ```
 iverilog -o sim rtl/vga_sync.v rtl/game_tick.v rtl/snake_head.v rtl/snake_map.v rtl/snake_body.v rtl/lfsr16.v rtl/food_ctrl.v rtl/game_ctrl.v rtl/pixel_gen.v rtl/vga_top.v tb/vga_top_tb.v
@@ -137,6 +164,12 @@ vvp sim
 Game over and restart (drives the snake into the wall, checks it freezes, then restarts):
 ```
 iverilog -o sim rtl/vga_sync.v rtl/game_tick.v rtl/snake_head.v rtl/snake_map.v rtl/snake_body.v rtl/lfsr16.v rtl/food_ctrl.v rtl/game_ctrl.v rtl/pixel_gen.v rtl/vga_top.v tb/gameover_tb.v
+vvp sim
+```
+
+Full game with buttons (steers with button presses only and checks the U-turn rule end to end):
+```
+iverilog -o sim rtl/vga_sync.v rtl/game_tick.v rtl/snake_head.v rtl/snake_map.v rtl/snake_body.v rtl/lfsr16.v rtl/food_ctrl.v rtl/game_ctrl.v rtl/pixel_gen.v rtl/vga_top.v rtl/dir_ctrl.v rtl/seg7.v rtl/score_display.v rtl/snake_top.v tb/snake_top_tb.v
 vvp sim
 ```
 
