@@ -1,0 +1,57 @@
+vga_sync
+- vga monitor has no memory of picture, it draws a pixel at a time (left to right, top to bottom)
+- we have to tell it where each line & frame starts
+	- Hsync: short pulse that means "start a new line"
+	- Vsync: short pulse that means "start a new line"
+- our job is to count, while one counter tracks hc (column) & one tracks vc (row)
+- when hc reach the end of the line, it resets to 0 and vc goes up by 1. when vc reaches end it resets too.
+
+- screen is 640x480, but each line is 800 clock cycles long and each frame is 525 lines. extra time is blanking (leftover from CRT monitors), is needed to move the beam back. The sync pulses sit inside that extra time. The signals are active low, so they sit at 1 normally and drop to 0 during the pulse.
+
+
+code:
+
+- reg holds a value between clock edges, and wire is just a connection. The counters are regs because they remember.
+<= inside a clocked always block means "update at clock edge," which is how real flip flops behave. Use it for anything clocked
+[9:0] means 10 bits, enough to count to 1023, which covers 799 and 524.**
+The assign lines are combinational. They have no clock, so they change immediately when hc and vc changes. 
+Why 656 & 752 for hsync? 640 visible + 16 sync front porch = 656 is where the pulse starts, and it lasts 96 cycles, so it ends at 752. 
+
+
+Check your understanding: why does vsync use 490 and 492? Work it out from the table I gave you earlier (480 visible, 10 front porch, 2 lines of sync).
+
+ANSWER: 490 because it takes from the 480 original + the 10 front porch. 
+	492 because it takes from the 480 original + 10 front porch + 2 lines of sync
+
+
+
+test branch:
+
+@(posedge clk); waits for the next clock edge, and a repeat (N) begin ... end loop runs a block N times.
+To get to the start of a line, while (x != 0) @(posedge clk); works. careful tho, after reset x is 0 at the start so decide if u want to start there or one line later.
+Inside a loop, do if (hsync == 0) hsync_low_count = hsync_low_count + 1;, then compare with 96 afterward and add 1 to errors if it doesn't match.
+Use $display("hsync low count = %0d", hsync_low_count); so you can see the numbers. 
+
+
+
+
+the pixel generator
+
+so far, we only produced the timing. but a monitor needs color: RGB for each pixel. 
+This design will output a 4 bit value per channel, which is what typical FPGA boards resistor ladder VGA port expects. 
+color must be black (all 0's) when active is low. During blanking the monitor uses the signal to calibrate its black level, so any color there can shift the whole picture which is why active exists. 
+A pixel generator is a combinational module. It has no clock nor memory. For each (x,y) it just answers "what color is this pixel?" The sync generator tells it where the beam is, and the pixel generator decides what to draw.
+
+
+
+
+questions to ask:
+
+- you said the extra time in the clock cycles and frames is needed to move the beam back, why? (step 2)
+- whats the difference between vga monitors and others? if vga has no memory do the others have memory?
+- is h and v sync like x and y in a graph?
+- flip-flops?
+go over coding like always
+what is meant by blanking
+original? front porch? lines of sync? 
+

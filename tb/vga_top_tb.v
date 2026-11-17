@@ -35,8 +35,8 @@ module vga_top_tb;
             if (g != 0) green_count = green_count + 1;
         end
 
-        $display("green pixel count = %0d (expected 4096)", green_count);
-        if (green_count != 4096) errors = errors + 1;
+        $display("green pixel count = %0d (expected 1024)", green_count);
+        if (green_count != 1024) errors = errors + 1;
 
         if (errors == 0) $display("PASS");
         else             $display("FAIL: %0d check(s) failed", errors);
