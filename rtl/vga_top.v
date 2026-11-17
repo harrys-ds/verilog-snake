@@ -10,6 +10,7 @@ module vga_top #(
     output wire       vsync,
     output wire       game_over,
     output wire       move_tick,     // the tick the snake head moves on
+    output wire [8:0] snake_len,     // current snake length
     output wire [3:0] r,
     output wire [3:0] g,
     output wire [3:0] b
@@ -27,6 +28,7 @@ module vga_top #(
     wire [4:0]  set_x, clear_x;
     wire [3:0]  set_y, clear_y;
     wire [8:0]  length;
+    assign snake_len = length;
     wire        body_occupied, head_cell_occupied;
 
     wire [15:0] rnd;
