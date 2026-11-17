@@ -4,7 +4,7 @@ module vga_top #(
     input  wire       clk,
     input  wire       rst,
     input  wire [1:0] dir,           // 0 up, 1 right, 2 down, 3 left
-    input  wire       grow,          // 1 = snake grows on its next move
+    input  wire       grow,          // forces growth on the next move (for testing)
     output wire       hsync,
     output wire       vsync,
     output wire [3:0] r,
@@ -23,6 +23,13 @@ module vga_top #(
     wire [8:0]  length;
     wire        body_occupied;
 
+    wire [15:0] rnd;
+    wire [4:0]  cand_x, food_x;
+    wire [3:0]  cand_y, food_y;
+    wire        cand_occupied, food_valid, food_grow;
+
+    wire        grow_all = grow | food_grow;
+
     vga_sync sync (
         .clk(clk), .rst(rst),
         .hsync(hsync), .vsync(vsync),
@@ -39,7 +46,7 @@ module vga_top #(
     );
 
     snake_body body (
-        .clk(clk), .rst(rst), .tick(tick), .grow(grow),
+        .clk(clk), .rst(rst), .tick(tick), .grow(grow_all),
         .head_x(head_x), .head_y(head_y),
         .set_en(set_en), .set_x(set_x), .set_y(set_y),
         .clear_en(clear_en), .clear_x(clear_x), .clear_y(clear_y),
@@ -50,14 +57,27 @@ module vga_top #(
         .clk(clk), .rst(rst),
         .set_en(set_en), .set_x(set_x), .set_y(set_y),
         .clear_en(clear_en), .clear_x(clear_x), .clear_y(clear_y),
-        .rd_x(x[9:5]), .rd_y(y[8:5]),
-        .rd_occupied(body_occupied)
+        .rd_x(x[9:5]), .rd_y(y[8:5]), .rd_occupied(body_occupied),
+        .rd2_x(cand_x), .rd2_y(cand_y), .rd2_occupied(cand_occupied)
+    );
+
+    lfsr16 rng (
+        .clk(clk), .rst(rst), .q(rnd)
+    );
+
+    food_ctrl food (
+        .clk(clk), .rst(rst), .tick(tick),
+        .head_x(head_x), .head_y(head_y), .rnd(rnd),
+        .cand_x(cand_x), .cand_y(cand_y), .cand_occupied(cand_occupied),
+        .food_x(food_x), .food_y(food_y), .food_valid(food_valid),
+        .grow(food_grow)
     );
 
     pixel_gen pixels (
         .active(active), .x(x), .y(y),
         .head_x(head_x), .head_y(head_y),
         .body_occupied(body_occupied),
+        .food_x(food_x), .food_y(food_y), .food_valid(food_valid),
         .r(r), .g(g), .b(b)
     );
 endmodule
